@@ -4,4 +4,8 @@ You need a JRE (Java Runtime Environment) installed on you machine.
 
 Current implementation state
 =============================
-created groovy runtime environment
+iteration over forums and topics
+
+Next stepts
+============
+iteration over posts
