@@ -6,4 +6,4 @@ for /R ./lib %%a in (*.jar) do (
 )
 set CLASSPATH=!CLASSPATH!"
 
-java groovy.ui.GroovyMain phpbb2wxr.groovy
+java groovy.ui.Console

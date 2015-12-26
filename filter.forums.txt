@@ -1,0 +1,4 @@
+#
+# put the ID's of the forums (one per line) if you wish to filter the export to this forums
+# no entries means - all forums
+#
