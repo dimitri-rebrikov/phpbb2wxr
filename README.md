@@ -6,8 +6,10 @@ Current implementation state
 =============================
 iteration over forums and topics
 export post
+export comments
+export categories
 
 Next stepts
 ============
-export comments
-export categories
+test/bug fixing
+probably the forum to category translations

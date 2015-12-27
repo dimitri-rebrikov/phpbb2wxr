@@ -2,4 +2,4 @@
 # put the ID's of the topics (one per line) if you wish to filter the export to this topics
 # no entries means - all topics
 #
-896
+#896
