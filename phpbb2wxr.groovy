@@ -169,6 +169,7 @@ def reformatPost(post) {
 	post=post.replaceAll(/(?s)\[color=(.+?):.*?\](.+?)\[\/color.*?\]/,'<span style="color: $1;">$2</span>')
 	post=post.replaceAll(/(?s)\[i:.*?\](.+?)\[\/i:.*?\]/,'<em>$1</em>')
 	post=post.replaceAll(/(?s)\[b:.*?\](.+?)\[\/b:.*?\]/,'<strong>$1</strong>')
+	post=post.replaceAll(/(?s)\[u:.*?\](.+?)\[\/u:.*?\]/,'<span style="text-decoration: underline;">$1</span>')
 	post=post.replaceAll(/(?s)\[quote:.*?\](.+?)\[\/quote:.*?\]/,'<blockquote>$1</blockquote>')
 	post=post.replaceAll(/(?s)\[url=(.+?):.*?\](.+?)\[\/url:.*?\]/,'<a href="$1" target="_blank">$2</a>')
 	post=post.replaceAll(/(?s)\[url:.*?\](.+?)\[\/url:.*?\]/,'<a href="$1" target="_blank">$1</a>')
