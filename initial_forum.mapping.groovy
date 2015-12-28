@@ -24,9 +24,9 @@ outputFile.withWriter('UTF-8'){ writer ->
 		cur_forum_name=StringEscapeUtils.unescapeHtml4(row.forum_name)
 		if(parent_name != cur_parent_name) {
 			parent_name = cur_parent_name
-			writer << "#\r\n# $parent_name\r\n#\r\n"
+			writer << "\r\n#\r\n#\r\n# $parent_name\r\n#\r\n"
 		}
-		writer << "$cur_forum_name:::${cur_forum_name.toUpperCase()}\r\n"
+		writer << "\r\n#$cur_forum_name\r\n$row.forum_id:::${cur_forum_name.toUpperCase()}\r\n"
 	}
 }
 
@@ -34,7 +34,7 @@ def writeFileBeginning(writer) {
 	writer << '''
 #\r\n
 # Format:\r\n
-# <phpBB_forum_name>:::<WordPress_category_name>\r\n
+# <phpBB_forum_ID>:::<WordPress_category_name>\r\n
 #\r\n
 #\r\n
 '''
