@@ -6,4 +6,4 @@ for /R ./lib %%a in (*.jar) do (
 )
 set CLASSPATH=!CLASSPATH!"
 
-java groovy.ui.GroovyMain %*
+java -Dfile.encoding=UTF-8 groovy.ui.GroovyMain %*

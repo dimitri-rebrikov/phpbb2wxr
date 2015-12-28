@@ -16,16 +16,18 @@ postInfoFile = 'post.info.txt'
 
 forumIdFilterFile = 'filter.forums.txt'
 topicIdFilterFile = 'filter.topics.txt'
+forumToCategoryMappingFile = 'forum.mapping.txt'
 
 forumIdFilter = loadIds(forumIdFilterFile)
 topicIdFilter = loadIds(topicIdFilterFile)
 
 postIdSet = [] as Set
 commentIdToPostIdMap = [:]
-
 uniquePostTitleMap = [:]
+forumToCategoryMapping = [:]
 
 loadPostInfo(postInfoFile)
+loadForumToCategoryMapping(forumToCategoryMappingFile)
 
 log.info('connect to the phpbb database')
 sql = Sql.newInstance('jdbc:mysql://localhost:3306/phpbb', 'root', '', 'org.gjt.mm.mysql.Driver')
@@ -36,24 +38,24 @@ new File(outputFile).withWriter('UTF-8'){ writer ->
 
 	log.info('iterate over the forums table')
 	sql.eachRow('select forum_id from ' + tableForums + ' order by forum_id ') { frow ->
-		if(forumIdFilter.size()>0 && !forumIdFilter.contains(frow.forum_id)) {
-			log.trace("Forum ID $frow.forum_id is not is the forum ID filter list -> ignore it.")
+		if(!isForumToTake(frow.forum_id)) {
+			log.trace("Forum ID $frow.forum_id is not to take -> ignore it.")
 			return
 		}
 		def forum = getForum(frow.forum_id)
-		log.trace("Forum $forum.id $forum.name parent: ${forum.parent?.name}")
+		log.trace("Forum $forum.id \"$forum.name\"")
 		sql.eachRow('select topic_id from ' + tableTopics + ' where forum_id = ? order by topic_id', [forum.id]) { trow ->
 			if(topicIdFilter.size()>0 && !topicIdFilter.contains(trow.topic_id)) {
 				log.trace("Topic ID $trow.topic_id is not is the topic ID filter list -> ignore it.")
 				return
 			}
 			def topic = getTopic(trow.topic_id)
-			log.trace("Topic $topic.id $topic.name")
+			log.trace("Topic $topic.id \"$topic.name\"")
 			def postCommentMap = [:]
 			def curPostId = null
 			def curCommentIdSet = [] as Set
 			sql.eachRow('select post_id, post_subject from ' + tablePosts + ' where topic_id = ? order by post_time', [topic.id]) { prow ->
-				log.trace("Post $prow.post_id $prow.post_subject")
+				log.trace("Post $prow.post_id \"$prow.post_subject\"")
 				if(postIdSet.contains(prow.post_id) || !(commentIdToPostIdMap.containsKey(prow.post_id) || isCommentSubject(prow.post_subject))) {
 					log.trace("$prow.post_id is a POST")
 					if(curPostId != null) {
@@ -79,7 +81,8 @@ new File(outputFile).withWriter('UTF-8'){ writer ->
 def loadIds(file) {
 	set = [] as Set
 	new File(file).eachLine{ line ->
-		if(line =~ /^\s*#/) {
+		line = line.trim()
+		if(line =~ /^\s*#/  || line =~ /^\s*$/) {
 			return
 		}
 		log.trace("load ID: $line from $file")
@@ -95,7 +98,6 @@ def isCommentSubject(subject) {
 def getForum(id) {
 	def row = sql.firstRow('select * from ' + tableForums + ' where forum_id=?', [id])
 	def forum = [id:row.forum_id, name:row.forum_name]
-	forum.parent = row.parent_id ? getForum(row.parent_id) : null
 	return forum
 }
 
@@ -174,9 +176,14 @@ def reformatPost(post) {
 }
 
 def createPostName(title, id) {
-	title = title.toLowerCase().replaceAll(/\W/,'-')
-	return title+'-'+id
+	return getNiceName(title)+'-'+id
 }
+
+def getNiceName(name) {
+	return name.toLowerCase().replaceAll(/ä/,'ae').replaceAll(/ü/,'ue').replaceAll(/ö/,'oe').replaceAll(/ß/,'ss').replaceAll(/\W+/,'-')
+}
+
+def getNice
 
 def formatPubDate(date) {
 	if(date == null) {
@@ -200,10 +207,11 @@ def getUniquePostTitle(post) {
 
 def loadPostInfo(file) {
 	new File(file).eachLine{ line ->
+		line = line.trim()
 		if(line =~ /^\s*#/ || line =~ /^\s*$/) {
 			return
 		}
-		log.trace("post info line $line")
+		log.trace("post info line \"$line\"")
 		def arr = line.toUpperCase().split(/:/)
 		def type = arr[1]
 		if(type == 'B') {
@@ -221,14 +229,65 @@ def loadPostInfo(file) {
 	}
 }
 
+def loadForumToCategoryMapping(fileName) {
+	def file = new File(fileName)
+	if(!file.exists()) {
+		log.warn("file \"$fileName\" does not exist! So assume there is NO special forum to categorie mapping.")
+		return
+	}
+	file.eachLine{ line ->
+		line = line.trim()
+		if(line =~ /^\s*#/ || line =~ /^\s*$/) {
+			return
+		}
+		log.trace("forum to category mapping line \"$line\"")
+		def arr = line.split(/:::/)
+		def forumId = arr[0].trim() as int
+		def category = arr.length > 1 ? arr[1].trim() : ""
+		log.trace("forum to category mapping $forumId -> \"$category\"")
+		forumToCategoryMapping[forumId]=category
+	}
+}
+
+
+
+def isForumToTake(forumId) {
+	if(forumIdFilter.size()>0 && !forumIdFilter.contains(forumId)) {
+		log.trace("Forum ID $forumId is not in the forum ID filter list -> do not take id")
+		return false
+	}
+	def category = forumToCategoryMapping[forumId]
+	if(category == null || category.trim().size() > 0) {
+		log.trace("the forum $forumId is either not in the list or has a category mapping -> take it")
+		return true;
+	} else {
+		log.trace("empty entry for the forum $forumId in the forum to category mapping -> do not take is")
+		return false;
+	}
+}
+
+def getCategoryForForumId(forum_id) {
+	def name = forumToCategoryMapping[forum_id]
+	log.trace("category for the forum $forum_id: \"$name\"")
+	if(name == null || name.trim().size() == 0) {
+		def forum = getForum(forum_id)
+		name = forum.name.toUpperCase()
+		log.trace("did not found the category for the forum $forum_id so generate one \"$name\"")
+	}
+	return name
+}
+
 def writePostItem(postId, commentIdSet, writer) {
+	log.trace("write export for the post $postId")
 	def post = getPost(postId)
 	def xml = new groovy.xml.MarkupBuilder(writer)
 	xml.item{
 		title{mkp.yieldUnescaped('<![CDATA[' + getUniquePostTitle(post) + ']]>')}
+		writeCategory(post.forum_id, xml)
 		pubDate(formatPubDate(post.date))
 		guid('phpbb_p' + post.id)
 		link(phpBbLinkPrefix + post.id)
+		'wp:post_name'(createPostName(post.title, post.id))
 		'wp:post_id'(post.id)
 		'dc:creator'(post.creator)
 		'wp:post_date'(post.date?.format('yyyy-MM-dd HH:mm:ss'))
@@ -236,19 +295,10 @@ def writePostItem(postId, commentIdSet, writer) {
 		'wp:post_type'('post')
 		'wp:comment_status'('open')
         'wp:ping_status'('open')
-        'wp:post_name'(createPostName(post.title, post.id))
         'wp:status'('publish')
         'wp:post_parent'(0)
         'wp:menu_order'(0)
 		'wp:is_sticky'(0)
-		def forum = getForum(post.forum_id)
-		while(true) {
-			writeCategory(forum, xml)
-			forum = forum.parent
-			if(forum == null) {
-				break
-			}
-		}
 		commentIdSet.each{ commentId ->
 			writeCommentItem(commentId, xml)
 		}
@@ -256,6 +306,7 @@ def writePostItem(postId, commentIdSet, writer) {
 }
 
 def writeCommentItem(commentId, xml) {
+	log.trace("write export for the comment $commentId")
 	def comment = getPost(commentId)
 	xml.'wp:comment'{
 			'wp:comment_id'(comment.id)
@@ -269,9 +320,10 @@ def writeCommentItem(commentId, xml) {
 	}
 }
 
-def writeCategory(forum, xml) {
-	def name = forum.name.toUpperCase();
-	def niceName = forum.name.toLowerCase().replaceAll(/\W+/,'-')
+def writeCategory(forum_id, xml) {
+	log.trace("write export category for the forum $forum_id")
+	def name = getCategoryForForumId(forum_id)
+	def niceName = getNiceName(name)
 	xml.category(domain:"category", nicename:niceName) {
 		mkp.yieldUnescaped('<![CDATA[' + name + ']]>')
 	}
