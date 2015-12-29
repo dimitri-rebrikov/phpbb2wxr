@@ -16,7 +16,7 @@ postInfoFile = 'post.info.txt'
 
 forumIdFilterFile = 'filter.forums.txt'
 topicIdFilterFile = 'filter.topics.txt'
-forumToCategoryMappingFile = 'forum.mapping.txt'
+topicToCategoryMappingFile = 'forum.mapping.txt'
 
 log = Logger.getLogger('')
 
@@ -28,10 +28,10 @@ topicIdFilter = loadIds(topicIdFilterFile)
 postIdSet = [] as Set
 commentIdToPostIdMap = [:]
 uniquePostTitleMap = [:]
-forumToCategoryMapping = [:]
+topicToCategoryMapping = [:]
 
 loadPostInfo(postInfoFile)
-loadForumToCategoryMapping(forumToCategoryMappingFile)
+loadTopicToCategoryMapping(topicToCategoryMappingFile)
 
 log.info('connect to the phpbb database')
 sql = Sql.newInstance(databaseUrl, databaseUser, databasePwd, 'org.gjt.mm.mysql.Driver')
@@ -49,8 +49,8 @@ new File(outputFile).withWriter('UTF-8'){ writer ->
 		def forum = getForum(frow.forum_id)
 		log.trace("Forum $forum.id \"$forum.name\"")
 		sql.eachRow('select topic_id from ' + tableTopics + ' where forum_id = ? order by topic_id', [forum.id]) { trow ->
-			if(topicIdFilter.size()>0 && !topicIdFilter.contains(trow.topic_id)) {
-				log.trace("Topic ID $trow.topic_id is not is the topic ID filter list -> ignore it.")
+			if(!isTopicToTake(trow.topic_id)) {
+				log.trace("Topic ID $trow.topic_id is not to take -> ignore it.")
 				return
 			}
 			def topic = getTopic(trow.topic_id)
@@ -63,7 +63,7 @@ new File(outputFile).withWriter('UTF-8'){ writer ->
 				if(postIdSet.contains(prow.post_id) || !(commentIdToPostIdMap.containsKey(prow.post_id) || isCommentSubject(prow.post_subject))) {
 					log.trace("$prow.post_id is a POST")
 					if(curPostId != null) {
-						// we have new post arriving so save the current post with it comments
+						log.trace('we have new post arriving so save the current post with it comments')
 						postCommentMap[curPostId] = curCommentIdSet.clone()
 						curCommentIdSet.clear()
 					}
@@ -72,6 +72,10 @@ new File(outputFile).withWriter('UTF-8'){ writer ->
 					log.trace("$prow.post_id is a COMMENT")
 					curCommentIdSet.add(prow.post_id)
 				}
+			}
+			if(curPostId != null) {
+				log.trace('put the last post')
+				postCommentMap[curPostId] = curCommentIdSet.clone()
 			}
 			writePostItems(postCommentMap, writer)
 		}
@@ -234,7 +238,7 @@ def loadPostInfo(file) {
 	}
 }
 
-def loadForumToCategoryMapping(fileName) {
+def loadTopicToCategoryMapping(fileName) {
 	def file = new File(fileName)
 	if(!file.exists()) {
 		log.warn("file \"$fileName\" does not exist! So assume there is NO special forum to categorie mapping.")
@@ -247,10 +251,10 @@ def loadForumToCategoryMapping(fileName) {
 		}
 		log.trace("forum to category mapping line \"$line\"")
 		def arr = line.split(/:::/)
-		def forumId = arr[0].trim() as int
+		def topicId = arr[0].trim() as int
 		def category = arr.length > 1 ? arr[1].trim() : ""
-		log.trace("forum to category mapping $forumId -> \"$category\"")
-		forumToCategoryMapping[forumId]=category
+		log.trace("forum to category mapping $topicId -> \"$category\"")
+		topicToCategoryMapping[topicId]=category
 	}
 }
 
@@ -258,26 +262,36 @@ def loadForumToCategoryMapping(fileName) {
 
 def isForumToTake(forumId) {
 	if(forumIdFilter.size()>0 && !forumIdFilter.contains(forumId)) {
-		log.trace("Forum ID $forumId is not in the forum ID filter list -> do not take id")
+		log.trace("Forum ID $forumId is not in the forum ID filter list -> do not take it")
 		return false
-	}
-	def category = forumToCategoryMapping[forumId]
-	if(category == null || category.trim().size() > 0) {
-		log.trace("the forum $forumId is either not in the list or has a category mapping -> take it")
-		return true;
 	} else {
-		log.trace("empty entry for the forum $forumId in the forum to category mapping -> do not take is")
-		return false;
+		log.trace("Forum ID $forumId is in the forum ID filter list or the list is empty -> take it")
+		return true
 	}
 }
 
-def getCategoryForForumId(forum_id) {
-	def name = forumToCategoryMapping[forum_id]
-	log.trace("category for the forum $forum_id: \"$name\"")
+def isTopicToTake(topicId) {
+	if(topicIdFilter.size()>0 && !topicIdFilter.contains(topicId)) {
+		log.trace("Tipic ID $topicId is not in the forum ID filter list -> do not take it")
+		return false
+	}
+	def category = topicToCategoryMapping[topicId]
+	if(category == null || category.trim().size() > 0) {
+		log.trace("the topic $topicId is either not in the mapping list or has a category mapping -> take it")
+		return true
+	} else {
+		log.trace("empty entry for the topic $topicId in the topic to category mapping -> do not take it")
+		return false
+	}
+}
+
+def getCategoryForTopicId(topic_id) {
+	def name = topicToCategoryMapping[topic_id]
+	log.trace("category for the topic $topic_id: \"$name\"")
 	if(name == null || name.trim().size() == 0) {
-		def forum = getForum(forum_id)
-		name = forum.name.toUpperCase()
-		log.trace("did not found the category for the forum $forum_id so generate one \"$name\"")
+		def topic = getTopic(topic_id)
+		name = topic.name.toUpperCase()
+		log.trace("did not found the category for the topic $topic_id so generate the own one \"$name\"")
 	}
 	return name
 }
@@ -288,7 +302,7 @@ def writePostItem(postId, commentIdSet, writer) {
 	def xml = new groovy.xml.MarkupBuilder(writer)
 	xml.item{
 		title{mkp.yieldUnescaped('<![CDATA[' + getUniquePostTitle(post) + ']]>')}
-		writeCategory(post.forum_id, xml)
+		writeCategory(post.topic_id, xml)
 		pubDate(formatPubDate(post.date))
 		guid('phpbb_p' + post.id)
 		link(phpBbLinkPrefix + post.id)
@@ -325,9 +339,9 @@ def writeCommentItem(commentId, xml) {
 	}
 }
 
-def writeCategory(forum_id, xml) {
-	log.trace("write export category for the forum $forum_id")
-	def name = getCategoryForForumId(forum_id)
+def writeCategory(topic_id, xml) {
+	log.trace("write export category for the forum $topic_id")
+	def name = getCategoryForTopicId(topic_id)
 	def niceName = getNiceName(name)
 	xml.category(domain:"category", nicename:niceName) {
 		mkp.yieldUnescaped('<![CDATA[' + name + ']]>')

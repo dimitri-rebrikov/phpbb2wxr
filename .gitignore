@@ -1,2 +1,5 @@
 phpbb2wxr.output.xml
 *.log
+forum.mapping.txt
+filter.forums.txt
+filter.topics.txt
