@@ -44,7 +44,7 @@ def writeFileBeginning(writer) {
 #\r\n
 # Format:\r\n
 # <phpBB_topic_ID>:::<WordPress_category_name>\r\n
-#\r\n
-#\r\n
+# if you fill only the topic id but let the category name emty the corresponding topic will not be exported at all.\r\n
+# however if you complete omit a topic id in this file the automatic mapping will be used which maps the topic to uppercased topic name as category\r\n
 '''
 }

@@ -1,11 +1,11 @@
 import groovy.sql.*
 import org.apache.log4j.Logger
 
-log = Logger.getLogger('')
-
-phpBbLinkPrefix='/forum/viewtopic.php?p='
-
+databaseUrl = 'jdbc:mysql://localhost:3306/phpbb'
+databaseUser = 'root'
+databasePwd = ''
 tablePrefix = 'phpbb_'
+
 tableForums = tablePrefix + 'forums'
 tableTopics = tablePrefix + 'topics'
 tablePosts = tablePrefix + 'posts'
@@ -17,6 +17,10 @@ postInfoFile = 'post.info.txt'
 forumIdFilterFile = 'filter.forums.txt'
 topicIdFilterFile = 'filter.topics.txt'
 forumToCategoryMappingFile = 'forum.mapping.txt'
+
+log = Logger.getLogger('')
+
+phpBbLinkPrefix='/forum/viewtopic.php?p='
 
 forumIdFilter = loadIds(forumIdFilterFile)
 topicIdFilter = loadIds(topicIdFilterFile)
@@ -30,7 +34,7 @@ loadPostInfo(postInfoFile)
 loadForumToCategoryMapping(forumToCategoryMappingFile)
 
 log.info('connect to the phpbb database')
-sql = Sql.newInstance('jdbc:mysql://localhost:3306/phpbb', 'root', '', 'org.gjt.mm.mysql.Driver')
+sql = Sql.newInstance(databaseUrl, databaseUser, databasePwd, 'org.gjt.mm.mysql.Driver')
 
 new File(outputFile).withWriter('UTF-8'){ writer ->
 
