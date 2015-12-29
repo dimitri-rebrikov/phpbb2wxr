@@ -6,6 +6,7 @@ log = Logger.getLogger('')
 
 tablePrefix = 'phpbb_'
 tableForums = tablePrefix + 'forums'
+tableTopics = tablePrefix + 'topics'
 tablePosts = tablePrefix + 'posts'
 
 outputFile = new File('forum.mapping.txt')
@@ -18,15 +19,23 @@ outputFile.withWriter('UTF-8'){ writer ->
 	writeFileBeginning(writer)
 	def parent_name = null
 	
-	log.info('iterate over the forums in the posts table')
-	sql.eachRow('select forum_id, forum_name, (select forum_name from ' + tableForums + ' where forum_id=f.parent_id) parent_name from ' + tableForums + ' f where exists(select * from ' + tablePosts + ' where forum_id=f.forum_id) order by parent_name, forum_name') { row ->
+	log.info('iterate over the topics in the posts table')
+	sql.eachRow('''
+	select t.topic_id, t.topic_title topic_name, f.forum_id, f.forum_name, f.parent_id, pa.forum_name parent_name from ''' + tablePosts + ''' po
+		left join ''' + tableTopics + ''' t on t.topic_id = po.topic_id
+		left join ''' + tableForums + ''' f on f.forum_id = po.forum_id
+		left join ''' + tableForums + ''' pa on pa.forum_id = f.parent_id
+		group by t.topic_id, t.topic_title, f.forum_id, f.forum_name, f.parent_id, pa.forum_name
+		order by parent_name, forum_name, topic_title
+	''') { row ->
 		cur_parent_name=StringEscapeUtils.unescapeHtml4(row.parent_name)
 		cur_forum_name=StringEscapeUtils.unescapeHtml4(row.forum_name)
+		cur_topic_name=StringEscapeUtils.unescapeHtml4(row.topic_name)
 		if(parent_name != cur_parent_name) {
 			parent_name = cur_parent_name
 			writer << "\r\n#\r\n#\r\n# $parent_name\r\n#\r\n"
 		}
-		writer << "\r\n#$cur_forum_name\r\n$row.forum_id:::${cur_forum_name.toUpperCase()}\r\n"
+		writer << "\r\n#$cur_parent_name -> $cur_forum_name -> $cur_topic_name\r\n$row.topic_id:::${cur_topic_name.toUpperCase()}\r\n"
 	}
 }
 
@@ -34,7 +43,7 @@ def writeFileBeginning(writer) {
 	writer << '''
 #\r\n
 # Format:\r\n
-# <phpBB_forum_ID>:::<WordPress_category_name>\r\n
+# <phpBB_topic_ID>:::<WordPress_category_name>\r\n
 #\r\n
 #\r\n
 '''
