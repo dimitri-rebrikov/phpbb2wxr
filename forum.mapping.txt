@@ -1,0 +1,11 @@
+
+#
+
+# Format:
+
+# <phpBB_topic_ID>:::<WordPress_category_name>
+
+#
+
+#
+
