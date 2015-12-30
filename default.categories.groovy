@@ -61,29 +61,29 @@ outputFile.withWriter('UTF-8'){ writer ->
 		if(parent_name != cur_parent_name) {
 			parent_name = cur_parent_name
 			xml.'wp:category'{
-				'wp:category_nicename'{ mkp.yieldUnescaped('<![CDATA[' +  getNiceName(parent_name)  + ']]>') }
-				'wp:cat_name'{ mkp.yieldUnescaped('<![CDATA[' + parent_name + ']]>') }
+				'wp:category_nicename'{ mkp.yieldUnescaped('<![CDATA[' +  getNiceName(parent_name, row.parent_id)  + ']]>') }
+				'wp:cat_name'{ mkp.yield( parent_name ) }
 			}
 		}
 		if(forum_name != cur_forum_name) {
 			forum_name = cur_forum_name
 			xml.'wp:category'{
-				'wp:category_nicename'{ mkp.yieldUnescaped('<![CDATA[' +  getNiceName(forum_name)  + ']]>') }
-				'wp:cat_name'{ mkp.yieldUnescaped('<![CDATA[' + forum_name + ']]>') }
-				'wp:category_parent'{ mkp.yieldUnescaped('<![CDATA[' +  getNiceName(parent_name)  + ']]>') }
+				'wp:category_nicename'{ mkp.yieldUnescaped('<![CDATA[' +  getNiceName(forum_name, row.forum_id)  + ']]>') }
+				'wp:cat_name'{ mkp.yield( forum_name ) }
+				'wp:category_parent'{ mkp.yieldUnescaped('<![CDATA[' +  getNiceName(parent_name, row.parent_id)  + ']]>') }
 			}
 		}
 		xml.'wp:category'{
-			'wp:category_nicename'{ mkp.yieldUnescaped('<![CDATA[' + getNiceName(cur_topic_name)  + ']]>') }
-			'wp:cat_name'{ mkp.yieldUnescaped('<![CDATA[' + cur_topic_name + ']]>') }
-			'wp:category_parent'{ mkp.yieldUnescaped('<![CDATA[' + getNiceName(forum_name)  + ']]>') }
+			'wp:category_nicename'{ mkp.yieldUnescaped('<![CDATA[' + getNiceName(cur_topic_name, row.topic_id)  + ']]>') }
+			'wp:cat_name'{ mkp.yield( cur_topic_name ) }
+			'wp:category_parent'{ mkp.yieldUnescaped('<![CDATA[' + getNiceName(forum_name, row.forum_id)  + ']]>') }
 		}
 	}
 	writer << outputFileEnding
 }
 
-def getNiceName(name) {
-	return name.toLowerCase().replaceAll(/ä/,'ae').replaceAll(/ü/,'ue').replaceAll(/ö/,'oe').replaceAll(/ß/,'ss').replaceAll(/\W+/,'-')
+def getNiceName(name, id) {
+	return name.toLowerCase().replaceAll(/ä/,'ae').replaceAll(/ü/,'ue').replaceAll(/ö/,'oe').replaceAll(/ß/,'ss').replaceAll(/\W+/,'-') + '-' + id
 }
 
 def formatPubDate(date) {
