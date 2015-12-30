@@ -1,6 +1,9 @@
 import groovy.sql.*
 import org.apache.log4j.Logger
 
+// max export file size in bytes
+outputFileMaxSize=20971520
+
 databaseUrl = 'jdbc:mysql://localhost:3306/phpbb'
 databaseUser = 'root'
 databasePwd = ''
@@ -11,7 +14,7 @@ tableTopics = tablePrefix + 'topics'
 tablePosts = tablePrefix + 'posts'
 tableUsers = tablePrefix + 'users'
 
-outputFile = 'phpbb2wxr.output.xml'
+outputFileMask = 'phpbb2wxr.output%03d.xml'
 postInfoFile = 'post.info.txt'
 
 forumIdFilterFile = 'filter.forums.txt'
@@ -36,55 +39,77 @@ loadTopicToCategoryMapping(topicToCategoryMappingFile)
 log.info('connect to the phpbb database')
 sql = Sql.newInstance(databaseUrl, databaseUser, databasePwd, 'org.gjt.mm.mysql.Driver')
 
-new File(outputFile).withWriter('UTF-8'){ writer ->
+outputFileCounter=1
+outputFileSizeCounter=0
+outputFileStream=null
 
-	writeFileBeginning(writer)
 
-	log.info('iterate over the forums table')
-	sql.eachRow('select forum_id from ' + tableForums + ' order by forum_id ') { frow ->
-		if(!isForumToTake(frow.forum_id)) {
-			log.trace("Forum ID $frow.forum_id is not to take -> ignore it.")
+outputFileBeginning = ('''
+<rss version="2.0"
+	xmlns:excerpt="http://wordpress.org/export/1.2/excerpt/"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:wp="http://wordpress.org/export/1.2/"
+>
+<channel>
+	<title>wp</title>
+	<link>http://localhost/wordpress</link>
+	<description>Eine weitere WordPress-Seite</description>
+	<pubDate>''' + formatPubDate() + '''</pubDate>
+	<language>de-DE</language>
+	<wp:wxr_version>1.2</wp:wxr_version>
+	<wp:base_site_url>http://localhost/wordpress</wp:base_site_url>
+	<wp:base_blog_url>http://localhost/wordpress</wp:base_blog_url>
+''').getBytes()
+
+outputFileEnding = ('''
+   </channel>
+</rss>
+''').getBytes()
+
+log.info('iterate over the forums table')
+sql.eachRow('select forum_id from ' + tableForums + ' order by forum_id ') { frow ->
+	if(!isForumToTake(frow.forum_id)) {
+		log.trace("Forum ID $frow.forum_id is not to take -> ignore it.")
+		return
+	}
+	def forum = getForum(frow.forum_id)
+	log.trace("Forum $forum.id \"$forum.name\"")
+	sql.eachRow('select topic_id from ' + tableTopics + ' where forum_id = ? order by topic_id', [forum.id]) { trow ->
+		if(!isTopicToTake(trow.topic_id)) {
+			log.trace("Topic ID $trow.topic_id is not to take -> ignore it.")
 			return
 		}
-		def forum = getForum(frow.forum_id)
-		log.trace("Forum $forum.id \"$forum.name\"")
-		sql.eachRow('select topic_id from ' + tableTopics + ' where forum_id = ? order by topic_id', [forum.id]) { trow ->
-			if(!isTopicToTake(trow.topic_id)) {
-				log.trace("Topic ID $trow.topic_id is not to take -> ignore it.")
-				return
-			}
-			def topic = getTopic(trow.topic_id)
-			log.trace("Topic $topic.id \"$topic.name\"")
-			def postCommentMap = [:]
-			def curPostId = null
-			def curCommentIdSet = [] as Set
-			sql.eachRow('select post_id, post_subject from ' + tablePosts + ' where topic_id = ? order by post_time', [topic.id]) { prow ->
-				log.trace("Post $prow.post_id \"$prow.post_subject\"")
-				if(postIdSet.contains(prow.post_id) || !(commentIdToPostIdMap.containsKey(prow.post_id) || isCommentSubject(prow.post_subject))) {
-					log.trace("$prow.post_id is a POST")
-					if(curPostId != null) {
-						log.trace('we have new post arriving so save the current post with it comments')
-						postCommentMap[curPostId] = curCommentIdSet.clone()
-						curCommentIdSet.clear()
-					}
-					curPostId = prow.post_id
-				} else {
-					log.trace("$prow.post_id is a COMMENT")
-					curCommentIdSet.add(prow.post_id)
+		def topic = getTopic(trow.topic_id)
+		log.trace("Topic $topic.id \"$topic.name\"")
+		def postCommentMap = [:]
+		def curPostId = null
+		def curCommentIdSet = [] as Set
+		sql.eachRow('select post_id, post_subject from ' + tablePosts + ' where topic_id = ? order by post_time', [topic.id]) { prow ->
+			log.trace("Post $prow.post_id \"$prow.post_subject\"")
+			if(postIdSet.contains(prow.post_id) || !(commentIdToPostIdMap.containsKey(prow.post_id) || isCommentSubject(prow.post_subject))) {
+				log.trace("$prow.post_id is a POST")
+				if(curPostId != null) {
+					log.trace('we have new post arriving so save the current post with it comments')
+					postCommentMap[curPostId] = curCommentIdSet.clone()
+					curCommentIdSet.clear()
 				}
+				curPostId = prow.post_id
+			} else {
+				log.trace("$prow.post_id is a COMMENT")
+				curCommentIdSet.add(prow.post_id)
 			}
-			if(curPostId != null) {
-				log.trace('put the last post')
-				postCommentMap[curPostId] = curCommentIdSet.clone()
-			}
-			writePostItems(postCommentMap, writer)
 		}
-		
+		if(curPostId != null) {
+			log.trace('put the last post')
+			postCommentMap[curPostId] = curCommentIdSet.clone()
+		}
+		writePostItems(postCommentMap)
 	}
 	
-	writeFileEnding(writer)
-
 }
+outputFileStream?.close()
 
 def loadIds(file) {
 	set = [] as Set
@@ -135,40 +160,36 @@ def getUserName(id) {
 	return row?.username
 }
 
-
-def writeFileBeginning(writer) {
-	writer << '''
-<rss version="2.0"
-	xmlns:excerpt="http://wordpress.org/export/1.2/excerpt/"
-	xmlns:content="http://purl.org/rss/1.0/modules/content/"
-	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
-	xmlns:dc="http://purl.org/dc/elements/1.1/"
-	xmlns:wp="http://wordpress.org/export/1.2/"
->
-
-<channel>
-	<title>wp</title>
-	<link>http://localhost/wordpress</link>
-	<description>Eine weitere WordPress-Seite</description>
-	<pubDate>''' + formatPubDate() + '''</pubDate>
-	<language>de-DE</language>
-	<wp:wxr_version>1.2</wp:wxr_version>
-	<wp:base_site_url>http://localhost/wordpress</wp:base_site_url>
-	<wp:base_blog_url>http://localhost/wordpress</wp:base_blog_url>
-'''
-}
-
-def writeFileEnding(writer) {
-writer << '''
-   </channel>
-</rss>
-'''
-}
-
-def writePostItems(postCommentMap, writer) {
+def writePostItems(postCommentMap) {
 	postCommentMap.each{ postId, commentIdSet ->
+		def writer = new CharArrayWriter()
 		writePostItem(postId, commentIdSet, writer)
+		writeToOutputFile(writer.toString().getBytes())
 	}
+}
+
+def writeToOutputFile(byteArr) {
+	log.trace("write ${byteArr.length} bytes to the output file")
+	def minFileSize = byteArr.length + outputFileBeginning.length + outputFileEnding.length
+	if( minFileSize > outputFileMaxSize) {
+		throw new RuntimeException("Cannot write to the file as the resulting file size $minFileSize exceed the max file size $outputFileMaxSize")
+	}
+	if(outputFileSizeCounter + byteArr.length + outputFileBeginning.length > outputFileMaxSize) {
+		log.debug("close the existing output file as the current string size exeed the max file size")
+		outputFileStream.write(outputFileEnding)
+		outputFileStream.close()
+		outputFileStream = null
+		outputFileCounter++
+	}
+	if(outputFileStream == null) {
+		def fileName = String.format(outputFileMask, outputFileCounter)
+		log.debug("create new output file $fileName")
+		outputFileStream = new FileOutputStream(fileName)
+		outputFileStream.write(outputFileBeginning)
+		outputFileSizeCounter = outputFileBeginning.length
+	}
+	outputFileStream.write(byteArr)
+	outputFileSizeCounter += byteArr.length
 }
 
 def reformatPost(post) {
