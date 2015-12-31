@@ -2,7 +2,7 @@ import groovy.sql.*
 import org.apache.log4j.Logger
 
 // max export file size in bytes
-outputFileMaxSize=20971520
+outputFileMaxSize=67108864
 
 databaseUrl = 'jdbc:mysql://localhost:3306/phpbb'
 databaseUser = 'root'
@@ -147,7 +147,7 @@ def getPost(id) {
 		topic_id:row.topic_id,
 		forum_id:row.forum_id,
 		title:row.post_subject,
-		content:row.post_text,
+		content:row.post_text.replaceAll(/[\x00-\x08,\x0B,\x0C,\x0E-\x1F,\x7f]/,''),
 		creator:getUserName(row.poster_id),
 		creator_ip:row.poster_ip,
 		date:new Date(row.post_time * 1000)
@@ -306,17 +306,6 @@ def isTopicToTake(topicId) {
 	}
 }
 
-def getCategoryForTopicId(topic_id) {
-	def name = topicToCategoryMapping[topic_id]
-	log.trace("category for the topic $topic_id: \"$name\"")
-	if(name == null || name.trim().size() == 0) {
-		def topic = getTopic(topic_id)
-		name = topic.name.toUpperCase()
-		log.trace("did not found the category for the topic $topic_id so generate the own one \"$name\"")
-	}
-	return name
-}
-
 def writePostItem(postId, commentIdSet, writer) {
 	log.trace("write export for the post $postId")
 	def post = getPost(postId)
@@ -362,8 +351,20 @@ def writeCommentItem(commentId, xml) {
 
 def writeCategory(topic_id, xml) {
 	log.trace("write export category for the forum $topic_id")
-	def name = getCategoryForTopicId(topic_id)
-	def niceName = getNiceName(name)
+	def name = topicToCategoryMapping[topic_id]
+	def niceName
+	log.trace("category for the topic $topic_id: \"$name\"")
+	if(name == null || name.trim().size() == 0) {
+		def topic = getTopic(topic_id)
+		name = topic.name.toUpperCase()
+		log.trace("did not found the category for the topic $topic_id so generate the own one \"$name\"")
+		niceName = getNiceName(name)+'-'+topic_id
+		log.trace("generate nice name \"$niceName\" for \"$name\"")
+	} else {
+		niceName = getNiceName(name)
+		log.trace("use nice name \"$niceName\" for \"$name\"")
+	}
+	
 	xml.category(domain:"category", nicename:niceName) {
 		mkp.yieldUnescaped('<![CDATA[' + name + ']]>')
 	}
