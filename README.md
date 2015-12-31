@@ -37,3 +37,27 @@ This workflow is for you, if you already have an working WP instance and just li
 10. inspect the results in Word Press
 11. (optional) repeat from #3 to improve the results
 12. finally import the produced file into your productive Word Press instance
+
+Tips&Tricks
+=============
+
+Export file size
+----------------
+The maximal file size you can import into WP ist normally restricted to 2MB. 
+This is not the restriction of WP istself but of the PHP framework it runs on.
+If you export size produced by phpbb2wxr exeed this restriction you have 2 choices:
+
+1. reduce the parameter "outputFileMaxSize" in the phpbb2wxr.groov to 2MB (i.e. "outputFileMaxSize=2097152" because the parameter uses byte value). 
+This will lead to production of several output files which you can import one after another
+
+2. exceed the max upload file size in PHP by changing of the following 2 parameters in the php.ini on your web server upload_max_filesize and post_max_size 
+Example:
+upload_max_filesize = 64M
+post_max_size = 64M
+
+Automatic post to user assignment
+----------------------------------
+Testing on WP 4.4 I detecting a confusing behaviour in case you import serveral files.
+During the import of the first file the missing users will be automatic created if you dont provide the assignment during the import dialog.
+During the import of the following files you HAVE to provide the user assigment for the users which was automatically created during the import of previous files even the names are exactly the same.
+Otherwise the posts will be assigned to the default user.
