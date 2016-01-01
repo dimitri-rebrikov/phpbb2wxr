@@ -1,5 +1,6 @@
 import groovy.sql.*
 import org.apache.log4j.Logger
+import org.apache.commons.lang3.StringEscapeUtils
 
 // max export file size in bytes
 outputFileMaxSize=67108864
@@ -146,8 +147,8 @@ def getPost(id) {
 		id:row.post_id, 
 		topic_id:row.topic_id,
 		forum_id:row.forum_id,
-		title:row.post_subject,
-		content:row.post_text.replaceAll(/[\x00-\x08,\x0B,\x0C,\x0E-\x1F,\x7f]/,''),
+		title:StringEscapeUtils.unescapeHtml4(row.post_subject),
+		content:StringEscapeUtils.unescapeHtml4(row.post_text.replaceAll(/[\x00-\x08,\x0B,\x0C,\x0E-\x1F,\x7f]/,'')),
 		creator:getUserName(row.poster_id),
 		creator_ip:row.poster_ip,
 		date:new Date(row.post_time * 1000)
@@ -193,15 +194,27 @@ def writeToOutputFile(byteArr) {
 }
 
 def reformatPost(post) {
-	post=post.replaceAll(/(?s)\[size=\d\d\d:.*?\](.+?)\[\/size.*?\]/,'<h5>$1</h5>')
-	post=post.replaceAll(/(?s)\[size=\d\d:.*?\](.+?)\[\/size.*?\]/,'<h6>$1</h6>')
-	post=post.replaceAll(/(?s)\[color=(.+?):.*?\](.+?)\[\/color.*?\]/,'<span style="color: $1;">$2</span>')
-	post=post.replaceAll(/(?s)\[i:.*?\](.+?)\[\/i:.*?\]/,'<em>$1</em>')
-	post=post.replaceAll(/(?s)\[b:.*?\](.+?)\[\/b:.*?\]/,'<strong>$1</strong>')
-	post=post.replaceAll(/(?s)\[u:.*?\](.+?)\[\/u:.*?\]/,'<span style="text-decoration: underline;">$1</span>')
-	post=post.replaceAll(/(?s)\[quote:.*?\](.+?)\[\/quote:.*?\]/,'<blockquote>$1</blockquote>')
-	post=post.replaceAll(/(?s)\[url=(.+?):.*?\](.+?)\[\/url:.*?\]/,'<a href="$1" target="_blank">$2</a>')
-	post=post.replaceAll(/(?s)\[url:.*?\](.+?)\[\/url:.*?\]/,'<a href="$1" target="_blank">$1</a>')
+	def repl
+	while(true){
+		repl = reformatPostSingleRun(post)
+		if(repl == post) {
+		 break
+		 }
+		post = repl
+	}
+	return repl
+}
+def reformatPostSingleRun(post) {
+    post=post.replaceAll(/(?s)\[size=\d\d\d(:*.*?)\](.+?)\[\/size\1\]/,'<h5>$2</h5>')
+    post=post.replaceAll(/(?s)\[size=\d\d(:*.*?)\](.+?)\[\/size\1\]/,'<h6>$2</h6>')
+    post=post.replaceAll(/(?s)\[color=(.+?)(:*.*?)\](.+?)\[\/color\2\]/,'<span style="color: $1;">$3</span>')
+    post=post.replaceAll(/(?s)\[i(:*.*?)\](.+?)\[\/i\1\]/,'<em>$2</em>')
+    post=post.replaceAll(/(?s)\[b(:*.*?)\](.+?)\[\/b\1\]/,'<strong>$2</strong>')
+    post=post.replaceAll(/(?s)\[u(:*.*?)\](.+?)\[\/u\1\]/,'<span style="text-decoration: underline;">$2</span>')
+    post=post.replaceAll(/(?s)\[quote(:*.*?)\](.+?)\[\/quote\1\]/,'<blockquote>$2</blockquote>')
+    post=post.replaceAll(/(?s)\[quote="(.+?)"(:*.*?)\](.+?)\[\/quote\2\]/,'<blockquote><cite>$1</cite>:\r\n$3</blockquote>')
+    post=post.replaceAll(/(?s)\[url=(.+?)(:*.*?)\](.+?)\[\/url\2\]/,'<a href="$1" target="_blank">$3</a>')
+    post=post.replaceAll(/(?s)\[url(:*.*?)\](.+?)\[\/url\1\]/,'<a href="$2" target="_blank">$2</a>')
 	return post
 }
 
@@ -332,6 +345,7 @@ def writePostItem(postId, commentIdSet, writer) {
 			writeCommentItem(commentId, xml)
 		}
 	}
+	log.trace("wrote export for the post $postId")
 }
 
 def writeCommentItem(commentId, xml) {
