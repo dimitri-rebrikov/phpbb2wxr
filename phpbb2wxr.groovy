@@ -206,15 +206,25 @@ def reformatPost(post) {
 }
 def reformatPostSingleRun(post) {
     post=post.replaceAll(/(?s)\[size=\d\d\d(:*.*?)\](.+?)\[\/size\1\]/,'<h5>$2</h5>')
+	post=post.replaceAll(/(?s)\[size=\d\d\d\](.+?)\[\/size\]/,'<h5>$1</h5>')
     post=post.replaceAll(/(?s)\[size=\d\d(:*.*?)\](.+?)\[\/size\1\]/,'<h6>$2</h6>')
+	post=post.replaceAll(/(?s)\[size=\d\d\](.+?)\[\/size\]/,'<h6>$1</h6>')
     post=post.replaceAll(/(?s)\[color=(.+?)(:*.*?)\](.+?)\[\/color\2\]/,'<span style="color: $1;">$3</span>')
+	post=post.replaceAll(/(?s)\[color=(.+?)\](.+?)\[\/color\]/,'<span style="color: $1;">$2</span>')
     post=post.replaceAll(/(?s)\[i(:*.*?)\](.+?)\[\/i\1\]/,'<em>$2</em>')
+	post=post.replaceAll(/(?s)\[i\](.+?)\[\/i\]/,'<em>$1</em>')
     post=post.replaceAll(/(?s)\[b(:*.*?)\](.+?)\[\/b\1\]/,'<strong>$2</strong>')
+	post=post.replaceAll(/(?s)\[b\](.+?)\[\/b\]/,'<strong>$1</strong>')
     post=post.replaceAll(/(?s)\[u(:*.*?)\](.+?)\[\/u\1\]/,'<span style="text-decoration: underline;">$2</span>')
+	post=post.replaceAll(/(?s)\[u\](.+?)\[\/u\]/,'<span style="text-decoration: underline;">$1</span>')
     post=post.replaceAll(/(?s)\[quote(:*.*?)\](.+?)\[\/quote\1\]/,'<blockquote>$2</blockquote>')
+	post=post.replaceAll(/(?s)\[quote\](.+?)\[\/quote\]/,'<blockquote>$1</blockquote>')
     post=post.replaceAll(/(?s)\[quote="(.+?)"(:*.*?)\](.+?)\[\/quote\2\]/,'<blockquote><cite>$1</cite>:\r\n$3</blockquote>')
+	post=post.replaceAll(/(?s)\[quote="(.+?)"\](.+?)\[\/quote\]/,'<blockquote><cite>$1</cite>:\r\n$2</blockquote>')
     post=post.replaceAll(/(?s)\[url=(.+?)(:*.*?)\](.+?)\[\/url\2\]/,'<a href="$1" target="_blank">$3</a>')
+	post=post.replaceAll(/(?s)\[url=(.+?)\](.+?)\[\/url\]/,'<a href="$1" target="_blank">$2</a>')
     post=post.replaceAll(/(?s)\[url(:*.*?)\](.+?)\[\/url\1\]/,'<a href="$2" target="_blank">$2</a>')
+	post=post.replaceAll(/(?s)\[url\](.+?)\[\/url\]/,'<a href="$1" target="_blank">$1</a>')
 	return post
 }
 
