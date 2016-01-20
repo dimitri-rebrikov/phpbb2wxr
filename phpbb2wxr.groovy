@@ -238,7 +238,6 @@ def getNiceName(name) {
 	return name.toLowerCase().replaceAll(/ä/,'ae').replaceAll(/ü/,'ue').replaceAll(/ö/,'oe').replaceAll(/ß/,'ss').replaceAll(/\W+/,'-')
 }
 
-def getNice
 
 def formatPubDate(date) {
 	if(date == null) {
