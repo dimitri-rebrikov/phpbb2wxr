@@ -196,6 +196,7 @@ def writeToOutputFile(byteArr) {
 def reformatPost(post) {
 	def repl
 	while(true){
+		//log.trace("reformat post " + post)
 		repl = reformatPostSingleRun(post)
 		if(repl == post) {
 		 break
@@ -225,8 +226,8 @@ def reformatPostSingleRun(post) {
 	post=post.replaceAll(/(?s)\[url=(.+?)\](.+?)\[\/url\]/,'<a href="$1" target="_blank">$2</a>')
     post=post.replaceAll(/(?s)\[url(:.*?)\](.+?)\[\/url\1\]/,'<a href="$2" target="_blank">$2</a>')
 	post=post.replaceAll(/(?s)\[url\](.+?)\[\/url\]/,'<a href="$1" target="_blank">$1</a>')
-	post=post.replaceAll(/(?s)(<a.+?href="(.+?)".*?>)http:.+?<\/a>/,'$1$2</a>')
-	post=post.replaceAll(/(?s)(<a.+?)onclick=".+?"(.*?>.+?<\/a>)/,'$1$2')
+	post=post.replaceAll(/(?s)(<a\s+.*?href="([^"]+)"[^>]*>)http:.+?<\/a>/,'$1$2</a>')
+	post=post.replaceAll(/(?s)(<a\s+.*?)onclick=".+?"(.*?>.+?<\/a>)/,'$1$2')
 	return post
 }
 
@@ -373,6 +374,7 @@ def writeCommentItem(commentId, xml) {
 			'wp:comment_type'()
 			'wp:comment_parent'(0)
 	}
+	log.trace("wrote export for the comment $commentId")
 }
 
 def writeCategory(topic_id, xml) {
