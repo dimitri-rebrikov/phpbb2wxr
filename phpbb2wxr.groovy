@@ -422,7 +422,7 @@ def writeCategory(topic_id, xml) {
 
 def createAttachmentLinks(attachments) {
 	if(attachments == null) {
-		return
+		return ''
 	}
 	def links = ''
 	attachments.each{ attachment -> 
@@ -436,7 +436,6 @@ def copyAttachmentFiles(attachments) {
 	if(attachments == null) {
 		return
 	}
-	def links = ''
 	attachments.each{ attachment -> 
 		new File(wordpressUploadLocalDir).mkdirs()
 		def fromFile = phpBbFilesPath + '/' + attachment.filename_old
@@ -444,5 +443,4 @@ def copyAttachmentFiles(attachments) {
 		log.trace("Copy file $fromFile -> $toFile")
 		Files.copy(new File(fromFile).toPath(), new File(toFile).toPath())
 	}
-	return links
 }
