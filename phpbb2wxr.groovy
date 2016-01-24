@@ -1,10 +1,18 @@
 import groovy.sql.*
+import java.nio.file.*
 import org.apache.log4j.Logger
 import org.apache.commons.lang3.StringEscapeUtils
 
 // max export file size in bytes
 outputFileMaxSize=67108864
 
+// path to the local directory with phpBB attachment files 
+phpBbFilesPath = '../files'
+// base url where the attachment files for the wordpress will be put
+wordpressUploadDirBaseUrl = '/wordpress/wp-content/uploads/' + new Date().format('yyyy') + '/phpbb'
+wordpressUploadLocalDir = 'phpbb2wxr.output.files/' + new Date().format('yyyy') + '/phpbb'
+
+// url to the local mysql database with the copy of the phpBB database 
 databaseUrl = 'jdbc:mysql://localhost:3306/phpbb'
 databaseUser = 'root'
 databasePwd = ''
@@ -14,8 +22,10 @@ tableForums = tablePrefix + 'forums'
 tableTopics = tablePrefix + 'topics'
 tablePosts = tablePrefix + 'posts'
 tableUsers = tablePrefix + 'users'
+tableAttachments = tablePrefix + 'attachments'
 
-outputFileMask = 'phpbb2wxr.output%03d.xml'
+outputMediaFileDir = 'phpbb_files'
+outputFileMask = 'phpbb2wxr.output.%03d.xml'
 postInfoFile = 'post.info.txt'
 
 forumIdFilterFile = 'filter.forums.txt'
@@ -151,9 +161,18 @@ def getPost(id) {
 		content:StringEscapeUtils.unescapeHtml4(row.post_text.replaceAll(/[\x00-\x08,\x0B,\x0C,\x0E-\x1F,\x7f]/,'')),
 		creator:getUserName(row.poster_id),
 		creator_ip:row.poster_ip,
-		date:new Date(row.post_time * 1000)
+		date:new Date(row.post_time * 1000),
+		has_attachment:row.post_attachment
 	]
 	return post
+}
+
+def getAttachments(postId) {
+	def attachments = []
+	sql.eachRow('select * from ' + tableAttachments + ' where post_msg_id=?', [postId]) { row ->
+		attachments.add([filename_old:row.physical_filename, filename_new:row.attach_id + '_' + row.post_msg_id + '.' + row.extension])
+	}
+	return attachments
 }
 
 def getUserName(id) {
@@ -334,6 +353,9 @@ def isTopicToTake(topicId) {
 def writePostItem(postId, commentIdSet, writer) {
 	log.trace("write export for the post $postId")
 	def post = getPost(postId)
+	log.trace(post.dump())
+	def attachments = post.has_attachment ? getAttachments(postId) : null
+	copyAttachmentFiles(attachments)
 	def xml = new groovy.xml.MarkupBuilder(writer)
 	xml.item{
 		title{mkp.yieldUnescaped('<![CDATA[' + getUniquePostTitle(post) + ']]>')}
@@ -345,7 +367,7 @@ def writePostItem(postId, commentIdSet, writer) {
 		'wp:post_id'(post.id)
 		'dc:creator'(post.creator)
 		'wp:post_date'(post.date?.format('yyyy-MM-dd HH:mm:ss'))
-		'content:encoded'{mkp.yieldUnescaped('<![CDATA[' + reformatPost(post.content) + ']]>')}
+		'content:encoded'{mkp.yieldUnescaped('<![CDATA[' + reformatPost(post.content) + createAttachmentLinks(attachments) + ']]>')}
 		'wp:post_type'('post')
 		'wp:comment_status'('open')
         'wp:ping_status'('open')
@@ -396,4 +418,31 @@ def writeCategory(topic_id, xml) {
 	xml.category(domain:"category", nicename:niceName) {
 		mkp.yieldUnescaped('<![CDATA[' + name + ']]>')
 	}
+}
+
+def createAttachmentLinks(attachments) {
+	if(attachments == null) {
+		return
+	}
+	def links = ''
+	attachments.each{ attachment -> 
+		links = links + '\n\n <img src="' + wordpressUploadDirBaseUrl + '/' + attachment.filename_new  + '" alt="' + attachment.filename_new + '" /> '
+		log.trace('links: ' + links)
+	}
+	return links
+}
+
+def copyAttachmentFiles(attachments) {
+	if(attachments == null) {
+		return
+	}
+	def links = ''
+	attachments.each{ attachment -> 
+		new File(wordpressUploadLocalDir).mkdirs()
+		def fromFile = phpBbFilesPath + '/' + attachment.filename_old
+		def toFile = wordpressUploadLocalDir + '/' + attachment.filename_new
+		log.trace("Copy file $fromFile -> $toFile")
+		Files.copy(new File(fromFile).toPath(), new File(toFile).toPath())
+	}
+	return links
 }
