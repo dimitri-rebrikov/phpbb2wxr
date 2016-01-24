@@ -11,6 +11,8 @@ phpBbFilesPath = '../files'
 // base url where the attachment files for the wordpress will be put
 wordpressUploadDirBaseUrl = '/wordpress/wp-content/uploads/' + new Date().format('yyyy') + '/phpbb'
 wordpressUploadLocalDir = 'phpbb2wxr.output.files/' + new Date().format('yyyy') + '/phpbb'
+// path to phpbb smiles
+phpBbSmilesPath='/wordpress/wp-includes/images/smilies'
 
 // url to the local mysql database with the copy of the phpBB database 
 databaseUrl = 'jdbc:mysql://localhost:3306/phpbb'
@@ -225,6 +227,7 @@ def reformatPost(post) {
 	return repl
 }
 def reformatPostSingleRun(post) {
+	post=post.replaceAll(/(?s)\{SMILIES_PATH\}/,phpBbSmilesPath)
     post=post.replaceAll(/(?s)\[size=\d\d\d(:.*?)\](.+?)\[\/size\1\]/,'<h5>$2</h5>')
 	post=post.replaceAll(/(?s)\[size=\d\d\d\](.+?)\[\/size\]/,'<h5>$1</h5>')
     post=post.replaceAll(/(?s)\[size=\d\d(:.*?)\](.+?)\[\/size\1\]/,'<h6>$2</h6>')
