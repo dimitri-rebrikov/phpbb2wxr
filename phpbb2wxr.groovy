@@ -360,6 +360,7 @@ def writePostItem(postId, commentIdSet, writer) {
 	def attachments = post.has_attachment ? getAttachments(postId) : null
 	copyAttachmentFiles(attachments)
 	def xml = new groovy.xml.MarkupBuilder(writer)
+	xml.setDoubleQuotes(true);
 	xml.item{
 		title{mkp.yieldUnescaped('<![CDATA[' + getUniquePostTitle(post) + ']]>')}
 		writeCategory(post.topic_id, xml)
